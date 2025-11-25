@@ -84,14 +84,9 @@ Exemplo:
    pip install pandas customtkinter
    ```
 
-3. **Executar versão básica**:
+3. **Executar versão GUI no PC**:
    ```bash
    python GUI/sorteio.py
-   ```
-
-4. **Executar versão avançada**:
-   ```bash
-   python GUI/sorteio2.py
    ```
 
 ## Como Usar
