@@ -30,12 +30,12 @@ FxSorteios é uma aplicação para realização de sorteios com pesos personaliz
 O arquivo Excel deve conter pelo menos 3 colunas:
 
 - **Coluna A**: Código do participante (string/texto)
-- **Coluna B**: Nome do participante (string/texto)
+- **Coluna B**: Nome do cliente participante (string/texto)
 - **Coluna C**: Peso do participante (número, peso para o sorteio)
 
 Exemplo:
 
-| Código | Nome          | Cupons |
+| Código | Cliente          | Cupons |
 |--------|---------------|------|
 | 001    | João Silva    | 10   |
 | 002    | Maria Santos  | 5    |
