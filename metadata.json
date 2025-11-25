@@ -1,0 +1,5 @@
+{
+  "name": "Sorteio FxBlack",
+  "description": "A professional weighted raffle application. Upload an Excel file (.xlsx) where Col A=Code, Col B=Name, Col C=Weight. Features a high-contrast Orange/Black UI.",
+  "requestFramePermissions": []
+}
