@@ -1,168 +1,264 @@
-import tkinter as tk
+import customtkinter as ctk
 from tkinter import filedialog, messagebox
 import pandas as pd
 import random
+import time
+import threading
+
+# --- Configuração de Tema e Cores ---
+ctk.set_appearance_mode("Dark")  # Modo Escuro
+ctk.set_default_color_theme("dark-blue")
+
+# Paleta de Cores (FxBlack)
+COLOR_BLACK = "#0a0a0a"
+COLOR_DARK = "#171717"
+COLOR_ORANGE = "#f97316"
+COLOR_ORANGE_HOVER = "#c2410c"
+COLOR_TEXT_GRAY = "#a3a3a3"
+COLOR_WHITE = "#ffffff"
 
 
-class SorteioApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Sorteio de Clientes")
-        self.root.geometry("600x450")
+class SorteioApp(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-        # Definição de Cores
-        self.cor_fundo = "#121212"  # Preto suave
-        self.cor_laranja = "#FF6600"  # Laranja vibrante
-        self.cor_texto = "#FFFFFF"   # Branco
+        # Configuração da Janela
+        self.title("FxBlack Sorteador Ponderado")
+        self.geometry("900x600")
+        self.configure(fg_color=COLOR_BLACK)
 
-        self.root.configure(bg=self.cor_fundo)
+        # Variáveis de Estado
+        self.participants = []  # Lista de participantes carregados
+        self.is_animating = False
 
-        # Variáveis
-        self.df = None
-        self.arquivo_carregado = False
+        # Layout Principal (Grid 2 colunas: Sidebar | Main)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        # --- Elementos da Interface ---
+        self.create_sidebar()
+        self.create_main_area()
+
+    def create_sidebar(self):
+        """Cria a barra lateral com controles e histórico"""
+        self.sidebar = ctk.CTkFrame(
+            self, width=260, corner_radius=0, fg_color=COLOR_DARK)
+        self.sidebar.grid(row=0, column=0, sticky="nsew")
+        self.sidebar.grid_rowconfigure(4, weight=1)  # Faz o histórico expandir
 
         # Título
-        self.lbl_titulo = tk.Label(
-            root,
-            text="SORTEIO DAS MOTOS - FXBLACK",
-            font=("Helvetica", 24, "bold"),
-            bg=self.cor_fundo,
-            fg=self.cor_laranja
+        self.logo = ctk.CTkLabel(
+            self.sidebar,
+            text="FxBlack\nSorteios",
+            font=ctk.CTkFont(family="Arial", size=28, weight="bold"),
+            text_color=COLOR_ORANGE
         )
-        self.lbl_titulo.pack(pady=30)
+        self.logo.grid(row=0, column=0, padx=20, pady=(30, 10))
+
+        self.lbl_desc = ctk.CTkLabel(
+            self.sidebar,
+            text="Sistema de Sorteio Ponderado",
+            font=ctk.CTkFont(size=12),
+            text_color=COLOR_TEXT_GRAY
+        )
+        self.lbl_desc.grid(row=1, column=0, padx=20, pady=(0, 20))
 
         # Botão Carregar Arquivo
-        self.btn_carregar = tk.Button(
-            root,
-            text="📂 Carregar Cupons",
-            font=("Arial", 12, "bold"),
-            bg=self.cor_laranja,
-            fg="black",
-            width=25,
-            command=self.carregar_arquivo,
-            cursor="hand2",
-            relief="flat"
+        self.btn_load = ctk.CTkButton(
+            self.sidebar,
+            text="📂 Carregar Excel (.xlsx)",
+            command=self.load_file,
+            fg_color="#262626",
+            border_color=COLOR_ORANGE,
+            border_width=1,
+            hover_color="#333333",
+            height=40,
+            font=ctk.CTkFont(weight="bold")
         )
-        self.btn_carregar.pack(pady=10)
+        self.btn_load.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
 
-        # Label para mostrar nome do arquivo
-        self.lbl_arquivo = tk.Label(
-            root,
-            text="Nenhum arquivo carregado",
-            font=("Arial", 10),
-            bg=self.cor_fundo,
-            fg="#888888"
+        # Status
+        self.lbl_status = ctk.CTkLabel(
+            self.sidebar, text="Aguardando arquivo...", text_color=COLOR_TEXT_GRAY)
+        self.lbl_status.grid(row=3, column=0, padx=20, pady=5)
+
+        # Histórico
+        self.lbl_history_title = ctk.CTkLabel(
+            self.sidebar,
+            text="Histórico de Ganhadores:",
+            font=ctk.CTkFont(size=14, weight="bold"),
+            anchor="w"
         )
-        self.lbl_arquivo.pack(pady=5)
+        self.lbl_history_title.grid(
+            row=4, column=0, padx=20, pady=(20, 0), sticky="sw")
 
-        # Linha divisória
-        tk.Frame(root, height=2, bg=self.cor_laranja, width=500).pack(pady=20)
-
-        # Botão Realizar Sorteio
-        self.btn_sortear = tk.Button(
-            root,
-            text="🎲 REALIZAR SORTEIO",
-            font=("Arial", 16, "bold"),
-            bg="#333333",  # Cinza escuro desabilitado inicialmente
-            fg="#666666",
-            width=20,
-            state="disabled",
-            command=self.realizar_sorteio,
-            relief="flat"
+        self.txt_history = ctk.CTkTextbox(
+            self.sidebar,
+            fg_color=COLOR_BLACK,
+            text_color=COLOR_WHITE,
+            font=ctk.CTkFont(size=12)
         )
-        self.btn_sortear.pack(pady=20)
+        self.txt_history.grid(row=5, column=0, padx=20,
+                              pady=(5, 20), sticky="nsew")
+        self.txt_history.configure(state="disabled")
 
-        # Área do Resultado
-        self.lbl_resultado_titulo = tk.Label(
-            root,
-            text="Vencedor:",
-            font=("Arial", 12),
-            bg=self.cor_fundo,
-            fg=self.cor_texto
+    def create_main_area(self):
+        """Cria a área principal de sorteio"""
+        self.main_frame = ctk.CTkFrame(self, fg_color=COLOR_BLACK)
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=20, pady=20)
+
+        self.main_frame.grid_columnconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(0, weight=1)
+        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_rowconfigure(2, weight=1)
+
+        # Área do Vencedor
+        self.container_winner = ctk.CTkFrame(
+            self.main_frame, fg_color=COLOR_BLACK)
+        self.container_winner.grid(row=1, column=0, sticky="ew")
+
+        self.lbl_code = ctk.CTkLabel(
+            self.container_winner,
+            text="",
+            font=ctk.CTkFont(size=18),
+            text_color=COLOR_TEXT_GRAY
         )
-        self.lbl_resultado_titulo.pack()
+        self.lbl_code.pack(pady=(0, 10))
 
-        self.lbl_vencedor = tk.Label(
-            root,
-            text="---",
-            font=("Helvetica", 20, "bold"),
-            bg=self.cor_fundo,
-            fg=self.cor_laranja
+        self.lbl_winner = ctk.CTkLabel(
+            self.container_winner,
+            text="Carregue a planilha\npara começar",
+            font=ctk.CTkFont(size=48, weight="bold"),
+            text_color=COLOR_WHITE,
+            wraplength=600
         )
-        self.lbl_vencedor.pack(pady=10)
+        self.lbl_winner.pack()
 
-    def carregar_arquivo(self):
-        caminho_arquivo = filedialog.askopenfilename(
-            title="Selecione o arquivo Excel",
-            filetypes=[("Arquivos Excel", "*.xlsx")]
+        # Botão de Sorteio
+        self.btn_draw = ctk.CTkButton(
+            self.main_frame,
+            text="REALIZAR SORTEIO",
+            command=self.start_draw,
+            fg_color=COLOR_ORANGE,
+            hover_color=COLOR_ORANGE_HOVER,
+            text_color="black",
+            font=ctk.CTkFont(size=20, weight="bold"),
+            height=60,
+            width=300,
+            corner_radius=30
         )
+        self.btn_draw.grid(row=2, column=0, pady=50)
+        self.btn_draw.configure(state="disabled")
 
-        if caminho_arquivo:
-            try:
-                # Lê o arquivo Excel.
-                # header=0 assume que a primeira linha é cabeçalho.
-                self.df = pd.read_excel(caminho_arquivo)
-
-                # Verifica se tem pelo menos 3 colunas
-                if len(self.df.columns) < 3:
-                    messagebox.showerror(
-                        "Erro", "O arquivo precisa ter pelo menos 3 colunas (Código, Nome, Peso).")
-                    return
-
-                # Limpeza básica: Converte a coluna C (índice 2) para números, transformando erros em 0
-                coluna_peso = self.df.columns[2]
-                self.df[coluna_peso] = pd.to_numeric(
-                    self.df.iloc[:, 2], errors='coerce').fillna(0)
-
-                self.arquivo_carregado = True
-                self.lbl_arquivo.config(
-                    text=f"Arquivo carregado: ...{caminho_arquivo[-30:]}", fg="#00FF00")
-
-                # Ativa o botão de sorteio com a cor laranja
-                self.btn_sortear.config(
-                    state="normal", bg=self.cor_laranja, fg="black", cursor="hand2")
-
-                messagebox.showinfo(
-                    "Sucesso", f"{len(self.df)} participantes carregados!")
-
-            except Exception as e:
-                messagebox.showerror("Erro", f"Falha ao ler arquivo: {str(e)}")
-
-    def realizar_sorteio(self):
-        if not self.arquivo_carregado or self.df is None:
+    def load_file(self):
+        file_path = filedialog.askopenfilename(
+            filetypes=[("Arquivos Excel", "*.xlsx")])
+        if not file_path:
             return
 
         try:
-            # Pega os dados das colunas pelo índice (0=A, 1=B, 2=C)
-            codigos = self.df.iloc[:, 0].tolist()
-            nomes = self.df.iloc[:, 1].tolist()
-            pesos = self.df.iloc[:, 2].tolist()
+            # Lê o arquivo Excel
+            # Assumindo cabeçalhos na linha 1. Se não houver, ajuste 'header'.
+            df = pd.read_excel(file_path)
 
-            # Verifica se a soma dos pesos é maior que 0
-            if sum(pesos) <= 0:
-                messagebox.showwarning(
-                    "Atenção", "A soma dos pesos (coluna C) é zero. Verifique a planilha.")
+            if len(df.columns) < 3:
+                messagebox.showerror(
+                    "Erro", "O arquivo precisa ter as colunas A, B e C.")
                 return
 
-            # Realiza o sorteio ponderado
-            # k=1 significa 1 vencedor
-            indice_vencedor = random.choices(
-                range(len(self.df)), weights=pesos, k=1)[0]
+            # Seleciona as 3 primeiras colunas (A=0, B=1, C=2)
+            # Renomeia para facilitar manipulação
+            data = df.iloc[:, [0, 1, 2]].copy()
+            data.columns = ['code', 'name', 'weight']
 
-            vencedor_nome = nomes[indice_vencedor]
-            vencedor_codigo = codigos[indice_vencedor]
+            # Tratamento de dados
+            # Garante que peso é numérico, converte erros para NaN e preenche com 0
+            data['weight'] = pd.to_numeric(
+                data['weight'], errors='coerce').fillna(0)
 
-            # Atualiza a interface
-            self.lbl_vencedor.config(
-                text=f"🎉 {vencedor_codigo} - {vencedor_nome} 🎉")
+            # Remove pesos zerados ou negativos
+            valid_data = data[data['weight'] > 0]
+
+            # Converte para lista de dicionários
+            self.participants = valid_data.to_dict('records')
+
+            if not self.participants:
+                messagebox.showwarning(
+                    "Aviso", "Nenhum participante com peso > 0 encontrado.")
+                return
+
+            # Atualiza UI
+            self.lbl_status.configure(
+                text=f"{len(self.participants)} participantes carregados")
+            self.lbl_winner.configure(
+                text="Pronto para Sortear!", text_color=COLOR_WHITE)
+            self.lbl_code.configure(text="")
+            self.btn_draw.configure(state="normal")
+
+            # Visual feedback
+            messagebox.showinfo("Sucesso", "Arquivo carregado com sucesso!")
 
         except Exception as e:
-            messagebox.showerror("Erro no Sorteio", str(e))
+            messagebox.showerror("Erro", f"Falha ao ler arquivo: {str(e)}")
+
+    def start_draw(self):
+        if not self.participants or self.is_animating:
+            return
+
+        self.is_animating = True
+        self.btn_draw.configure(state="disabled", text="SORTEANDO...")
+        self.btn_load.configure(state="disabled")
+
+        # Executa a animação em uma thread separada para não travar a GUI
+        threading.Thread(target=self.run_animation, daemon=True).start()
+
+    def run_animation(self):
+        """Lógica do Sorteio + Animação"""
+
+        # 1. Lógica do Sorteio Ponderado
+        # Cria lista de pesos correspondentes
+        weights = [p['weight'] for p in self.participants]
+
+        # Escolhe um vencedor baseado no peso (random.choices retorna lista, pegamos o [0])
+        winner = random.choices(self.participants, weights=weights, k=1)[0]
+
+        # 2. Animação (Efeito de roleta)
+        duration = 3.0  # Segundos de animação
+        end_time = time.time() + duration
+
+        while time.time() < end_time:
+            # Escolhe um nome aleatório APENAS para efeito visual
+            temp_display = random.choice(self.participants)
+
+            # Atualiza a interface (deve ser feito na thread principal se possível,
+            # mas TKinter tolera edições simples de texto de threads)
+            self.lbl_winner.configure(
+                text=temp_display['name'], text_color=COLOR_TEXT_GRAY)
+            self.lbl_code.configure(text=f"Cód: {temp_display['code']}")
+
+            time.sleep(0.1)  # Velocidade da troca de nomes
+
+        # 3. Revelação Final
+        self.is_animating = False
+        self.show_winner(winner)
+
+    def show_winner(self, winner):
+        # Atualiza Labels
+        self.lbl_winner.configure(text=winner['name'], text_color=COLOR_ORANGE)
+        self.lbl_code.configure(text=f"Código Cliente: {winner['code']}")
+
+        # Reseta Botões
+        self.btn_draw.configure(state="normal", text="SORTEAR NOVAMENTE")
+        self.btn_load.configure(state="normal")
+
+        # Adiciona ao Histórico
+        timestamp = time.strftime("%H:%M:%S")
+        history_text = f"[{timestamp}] {winner['name']} (Peso: {winner['weight']})\n"
+
+        self.txt_history.configure(state="normal")
+        self.txt_history.insert("0.0", history_text)  # Insere no topo
+        self.txt_history.configure(state="disabled")
 
 
 if __name__ == "__main__":
-    root = tk.Tk()
-    app = SorteioApp(root)
-    root.mainloop()
+    app = SorteioApp()
+    app.mainloop()
