@@ -35,7 +35,7 @@ O arquivo Excel deve conter pelo menos 3 colunas:
 
 Exemplo:
 
-| Código | Nome          | Peso |
+| Código | Nome          | Cupons |
 |--------|---------------|------|
 | 001    | João Silva    | 10   |
 | 002    | Maria Santos  | 5    |
@@ -124,8 +124,8 @@ Para contribuir ou modificar:
 
 ## Licença
 
-Proprietário - Farmix Distribuidora. Todos os direitos reservados.
+Samgae Tecnologia LTDA.
 
 ## Contato
 
-Sistema desenvolvido para uso interno da Farmix Distribuidora.
+José Lucas Costa - joselucasgc@gmail.com
